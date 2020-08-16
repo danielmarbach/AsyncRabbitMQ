@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
@@ -17,14 +19,15 @@ namespace WorkerService.Benchmark
         private WorkPoolTaskCompletionSource tcsWorker;
         private List<Work> work;
         private WorkPoolSemaphoreSlim semaphoreWorker;
+        private WorkPoolChannels workpoolChannel;
 
         private class Config : ManualConfig
         {
             public Config()
             {
-                Add(MarkdownExporter.GitHub);
-                Add(MemoryDiagnoser.Default);
-                Add(Job.ShortRun);
+                AddExporter(MarkdownExporter.GitHub);
+                AddDiagnoser(MemoryDiagnoser.Default);
+                AddJob(Job.ShortRun);
             }
         }
 
@@ -40,14 +43,27 @@ namespace WorkerService.Benchmark
             this.semaphoreWorker = new WorkPoolSemaphoreSlim();
             this.semaphoreWorker.Start();
 
+            this.workpoolChannel = new WorkPoolChannels();
+            this.workpoolChannel.Start();
+
             this.work = Enumerable.Range(0, Elements).Select(i => new Work()).ToList();
         }
 
         [GlobalCleanup]
-        public void Cleanup()
+        public async Task Cleanup()
         {
             this.tcsWorker.Stop();
             this.semaphoreWorker.Stop();
+            await this.workpoolChannel.Stop();
+        }
+
+        [Benchmark]
+        public void Channel()
+        {
+            foreach (var w in work)
+            {
+                workpoolChannel.Enqueue(w);
+            }
         }
 
         [Benchmark]
@@ -188,5 +204,57 @@ namespace WorkerService.Benchmark
             _tokenRegistration.Dispose();
         }
 
+    }
+
+    class WorkPoolChannels
+    {
+        readonly Channel<Work> _channel;
+        private Task _worker;
+
+        public WorkPoolChannels()
+        {
+            _channel = Channel.CreateUnbounded<Work>(new UnboundedChannelOptions
+            {
+                SingleReader = true, SingleWriter = false, AllowSynchronousContinuations = false
+            });
+        }
+
+        public void Start()
+        {
+            _worker = Task.Run(Loop, CancellationToken.None);
+        }
+
+        public void Enqueue(Work work)
+        {
+            _channel.Writer.TryWrite(work);
+        }
+
+        async Task Loop()
+        {
+            while (await _channel.Reader.WaitToReadAsync().ConfigureAwait(false))
+            {
+                while (_channel.Reader.TryRead(out Work work))
+                {
+                    try
+                    {
+                        Task task = work.Execute();
+                        if (!task.IsCompleted)
+                        {
+                            await task.ConfigureAwait(false);
+                        }
+                    }
+                    catch (Exception)
+                    {
+
+                    }
+                }
+            }
+        }
+
+        public Task Stop()
+        {
+            _channel.Writer.Complete();
+            return _worker;
+        }
     }
 }

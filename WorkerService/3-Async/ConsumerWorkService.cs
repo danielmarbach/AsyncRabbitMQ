@@ -8,6 +8,16 @@ namespace WorkerService.Async
     class ConsumerWorkService
     {
         private readonly ConcurrentDictionary<IModel, WorkPool> workPools = new ConcurrentDictionary<IModel, WorkPool>();
+        protected int _concurrency;
+
+        public ConsumerWorkService()
+        {
+        }
+
+        public ConsumerWorkService(int concurrency)
+        {
+            _concurrency = concurrency;
+        }
 
         public void AddWork(IModel model, Action fn)
         {
