@@ -2,7 +2,7 @@
 <html lang='en'>
 <head>
 <meta charset='utf-8' />
-<title>WorkerService.Benchmark.WorkerComparison-20200816-203600</title>
+<title>WorkerService.Benchmark.WorkerComparison-20200816-213903</title>
 
 <style type="text/css">
 	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
@@ -24,18 +24,23 @@ WarmupCount=3
 </code></pre>
 
 <table>
-<thead><tr><th>        Method</th><th>Elements</th><th>     Mean</th><th>     Error</th><th>    StdDev</th><th>   Median</th><th>Ratio</th><th>RatioSD</th><th>Gen 0</th><th>Gen 1</th><th>Gen 2</th><th>Allocated</th>
+<thead><tr><th>        Method</th><th>Elements</th><th>     Mean</th><th>     Error</th><th>  StdDev</th><th>   Median</th><th>Ratio</th><th>RatioSD</th><th>Gen 0</th><th>Gen 1</th><th>Gen 2</th><th>Allocated</th>
 </tr>
-</thead><tbody><tr><td>SemaphoreSlim</td><td>1000</td><td>139.06 &mu;s</td><td>235.23 &mu;s</td><td>12.894 &mu;s</td><td>133.77 &mu;s</td><td>4.35</td><td>0.55</td><td>-</td><td>-</td><td>-</td><td>16385 B</td>
-</tr><tr><td>TaskCompletionSource</td><td>1000</td><td>32.15 &mu;s</td><td>48.64 &mu;s</td><td>2.666 &mu;s</td><td>31.31 &mu;s</td><td>1.00</td><td>0.00</td><td>0.6714</td><td>-</td><td>-</td><td>18239 B</td>
-</tr><tr><td>SemaphoreSlim</td><td>10000</td><td>1,292.11 &mu;s</td><td>44.61 &mu;s</td><td>2.445 &mu;s</td><td>1,293.05 &mu;s</td><td>3.42</td><td>0.18</td><td>-</td><td>-</td><td>-</td><td>-</td>
-</tr><tr><td>TaskCompletionSource</td><td>10000</td><td>378.13 &mu;s</td><td>368.97 &mu;s</td><td>20.224 &mu;s</td><td>378.24 &mu;s</td><td>1.00</td><td>0.00</td><td>6.8359</td><td>-</td><td>-</td><td>184829 B</td>
-</tr><tr><td>SemaphoreSlim</td><td>100000</td><td>11,849.48 &mu;s</td><td>22,490.07 &mu;s</td><td>1,232.757 &mu;s</td><td>12,033.82 &mu;s</td><td>3.45</td><td>0.41</td><td>-</td><td>-</td><td>-</td><td>1572888 B</td>
-</tr><tr><td>TaskCompletionSource</td><td>100000</td><td>3,434.29 &mu;s</td><td>1,468.43 &mu;s</td><td>80.490 &mu;s</td><td>3,453.67 &mu;s</td><td>1.00</td><td>0.00</td><td>50.7813</td><td>-</td><td>-</td><td>1790569 B</td>
-</tr><tr><td>SemaphoreSlim</td><td>1000000</td><td>165,609.55 &mu;s</td><td>114,928.00 &mu;s</td><td>6,299.591 &mu;s</td><td>166,858.02 &mu;s</td><td>4.34</td><td>0.29</td><td>-</td><td>-</td><td>-</td><td>16777538 B</td>
-</tr><tr><td>TaskCompletionSource</td><td>1000000</td><td>38,228.51 &mu;s</td><td>25,087.60 &mu;s</td><td>1,375.136 &mu;s</td><td>38,697.51 &mu;s</td><td>1.00</td><td>0.00</td><td>500.0000</td><td>-</td><td>-</td><td>17902594 B</td>
-</tr><tr><td>SemaphoreSlim</td><td>10000000</td><td>2,447,460.87 &mu;s</td><td>30,845,470.61 &mu;s</td><td>1,690,744.328 &mu;s</td><td>1,634,129.80 &mu;s</td><td>7.92</td><td>5.45</td><td>-</td><td>-</td><td>-</td><td>150997248 B</td>
-</tr><tr><td>TaskCompletionSource</td><td>10000000</td><td>309,246.93 &mu;s</td><td>145,152.17 &mu;s</td><td>7,956.280 &mu;s</td><td>309,975.10 &mu;s</td><td>1.00</td><td>0.00</td><td>4000.0000</td><td>4000.0000</td><td>-</td><td>186031864 B</td>
+</thead><tbody><tr><td>Channel</td><td>1000</td><td>91.21 &mu;s</td><td>268.03 &mu;s</td><td>14.692 &mu;s</td><td>89.52 &mu;s</td><td>2.60</td><td>0.40</td><td>-</td><td>-</td><td>-</td><td>6 B</td>
+</tr><tr><td>SemaphoreSlim</td><td>1000</td><td>234.47 &mu;s</td><td>1,140.08 &mu;s</td><td>62.491 &mu;s</td><td>200.14 &mu;s</td><td>6.66</td><td>1.56</td><td>-</td><td>-</td><td>-</td><td>16384 B</td>
+</tr><tr><td>TaskCompletionSource</td><td>1000</td><td>35.03 &mu;s</td><td>21.80 &mu;s</td><td>1.195 &mu;s</td><td>34.98 &mu;s</td><td>1.00</td><td>0.00</td><td>0.6714</td><td>-</td><td>-</td><td>18363 B</td>
+</tr><tr><td>Channel</td><td>10000</td><td>735.49 &mu;s</td><td>1,689.63 &mu;s</td><td>92.614 &mu;s</td><td>785.76 &mu;s</td><td>2.20</td><td>0.31</td><td>-</td><td>-</td><td>-</td><td>51 B</td>
+</tr><tr><td>SemaphoreSlim</td><td>10000</td><td>1,438.37 &mu;s</td><td>1,177.41 &mu;s</td><td>64.538 &mu;s</td><td>1,428.71 &mu;s</td><td>4.29</td><td>0.13</td><td>-</td><td>-</td><td>-</td><td>163842 B</td>
+</tr><tr><td>TaskCompletionSource</td><td>10000</td><td>335.52 &mu;s</td><td>93.06 &mu;s</td><td>5.101 &mu;s</td><td>334.69 &mu;s</td><td>1.00</td><td>0.00</td><td>7.8125</td><td>-</td><td>-</td><td>189706 B</td>
+</tr><tr><td>Channel</td><td>100000</td><td>6,480.49 &mu;s</td><td>23,604.57 &mu;s</td><td>1,293.846 &mu;s</td><td>6,164.78 &mu;s</td><td>2.01</td><td>0.35</td><td>-</td><td>-</td><td>-</td><td>290 B</td>
+</tr><tr><td>SemaphoreSlim</td><td>100000</td><td>17,884.81 &mu;s</td><td>149,107.67 &mu;s</td><td>8,173.095 &mu;s</td><td>13,361.81 &mu;s</td><td>5.57</td><td>2.59</td><td>-</td><td>-</td><td>-</td><td>1572909 B</td>
+</tr><tr><td>TaskCompletionSource</td><td>100000</td><td>3,221.54 &mu;s</td><td>1,694.54 &mu;s</td><td>92.883 &mu;s</td><td>3,196.08 &mu;s</td><td>1.00</td><td>0.00</td><td>66.4063</td><td>-</td><td>-</td><td>1859820 B</td>
+</tr><tr><td>Channel</td><td>1000000</td><td>95,381.12 &mu;s</td><td>544,484.47 &mu;s</td><td>29,845.031 &mu;s</td><td>85,179.71 &mu;s</td><td>2.82</td><td>0.96</td><td>-</td><td>-</td><td>-</td><td>3231 B</td>
+</tr><tr><td>SemaphoreSlim</td><td>1000000</td><td>343,370.58 &mu;s</td><td>6,778,783.54 &mu;s</td><td>371,568.000 &mu;s</td><td>129,102.90 &mu;s</td><td>10.33</td><td>11.43</td><td>-</td><td>-</td><td>-</td><td>16777472 B</td>
+</tr><tr><td>TaskCompletionSource</td><td>1000000</td><td>33,965.98 &mu;s</td><td>25,943.49 &mu;s</td><td>1,422.050 &mu;s</td><td>33,497.74 &mu;s</td><td>1.00</td><td>0.00</td><td>750.0000</td><td>-</td><td>-</td><td>18924852 B</td>
+</tr><tr><td>Channel</td><td>10000000</td><td>781,592.13 &mu;s</td><td>1,910,114.79 &mu;s</td><td>104,699.837 &mu;s</td><td>821,476.40 &mu;s</td><td>2.29</td><td>0.36</td><td>-</td><td>-</td><td>-</td><td>7744 B</td>
+</tr><tr><td>SemaphoreSlim</td><td>10000000</td><td>2,477,222.77 &mu;s</td><td>10,618,315.06 &mu;s</td><td>582,025.678 &mu;s</td><td>2,426,359.80 &mu;s</td><td>7.22</td><td>1.53</td><td>-</td><td>-</td><td>-</td><td>167774720 B</td>
+</tr><tr><td>TaskCompletionSource</td><td>10000000</td><td>341,844.47 &mu;s</td><td>260,680.55 &mu;s</td><td>14,288.781 &mu;s</td><td>346,426.60 &mu;s</td><td>1.00</td><td>0.00</td><td>6000.0000</td><td>-</td><td>-</td><td>192727136 B</td>
 </tr></tbody></table>
 </body>
 </html>
