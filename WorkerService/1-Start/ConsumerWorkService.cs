@@ -4,8 +4,6 @@ using System.Threading.Tasks;
 
 namespace WorkerService.Start
 {
-    // https://github.com/rabbitmq/rabbitmq-dotnet-client/issues/251
-    // https://particular.net/blog/rabbitmq-updates-in-nservicebus-6
     class ConsumerWorkService
     {
         public const int MAX_THUNK_EXECUTION_BATCH_SIZE = 16;

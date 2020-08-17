@@ -9,11 +9,11 @@ namespace BasicClientBits
 {
     class Program
     {
+        private const string InputQueue = "basic-bits";
+        private const string ConsumerTag = "basic-bits";
+
         static async Task Main(string[] args)
         {
-            var inputQueue = "basic-bits";
-            var consumerTag = "basic-bits";
-
             var connectionFactory = new ConnectionFactory
             {
                 HostName = "localhost",
@@ -23,14 +23,14 @@ namespace BasicClientBits
 
             #region TopologyAndSending
 
-            CreateTopologyIfNecessary(inputQueue, connectionFactory);
+            CreateTopologyIfNecessary(InputQueue, connectionFactory);
 
             var cts = new CancellationTokenSource();
-            var sendConnection = connectionFactory.CreateConnection($"{inputQueue} sender");
+            var sendConnection = connectionFactory.CreateConnection($"{InputQueue} sender");
             var senderChannel = new ConfirmsAwareChannel(sendConnection);
-            var sendMessagesTask = Task.Run(() => SendMessages(cts, senderChannel, inputQueue), CancellationToken.None);
+            var sendMessagesTask = Task.Run(() => SendMessages(cts, senderChannel, InputQueue), CancellationToken.None);
 
-            var receiveConnection = connectionFactory.CreateConnection($"{inputQueue} pump");
+            var receiveConnection = connectionFactory.CreateConnection($"{InputQueue} pump");
             var receiveChannel = receiveConnection.CreateModel();
 
             #endregion
@@ -39,12 +39,16 @@ namespace BasicClientBits
 
             var consumer = new EventingBasicConsumer(receiveChannel);
 
+            #region NotRelevant
+
             consumer.Registered += Consumer_Registered;
             receiveConnection.ConnectionShutdown += Connection_ConnectionShutdown;
 
+            #endregion
+
             consumer.Received += (sender, args) => Consumer_Received(sender, args, receiveChannel);
 
-            receiveChannel.BasicConsume(inputQueue, false, consumerTag, consumer);
+            receiveChannel.BasicConsume(InputQueue, false, ConsumerTag, consumer);
 
             #region Stop
 
@@ -63,6 +67,15 @@ namespace BasicClientBits
             #endregion
         }
 
+        private static void Consumer_Received(object? sender, BasicDeliverEventArgs e, IModel channel)
+        {
+            Console.Out.WriteLine($"v: {Encoding.UTF8.GetString(e.Body.Span)} / q: {channel.MessageCount(InputQueue)}");
+
+            Thread.Sleep(1000);
+
+            channel.BasicAck(e.DeliveryTag, false);
+        }
+
         private static async Task SendMessages(CancellationTokenSource cts, ConfirmsAwareChannel senderChannel,
             string inputQueue)
         {
@@ -71,15 +84,8 @@ namespace BasicClientBits
             {
                 var properties = senderChannel.CreateBasicProperties();
                 await senderChannel.SendMessage(inputQueue, messageNumber++.ToString(), properties);
-                await Task.Delay(1000);
+                await Task.Delay(450);
             }
-        }
-
-        private static void Consumer_Received(object? sender, BasicDeliverEventArgs e, IModel channel)
-        {
-            Console.Out.Write($"{Encoding.UTF8.GetString(e.Body.Span)} ");
-
-            channel.BasicAckSingle(e.DeliveryTag, TaskScheduler.Default);
         }
 
         #region NotRelevant
@@ -101,6 +107,7 @@ namespace BasicClientBits
             channel.QueueDeclare(queue, durable: true, false, false, null);
             CreateExchange(queue);
             channel.QueueBind(queue, queue, string.Empty);
+            channel.QueuePurge(queue);
             channel.Close();
             adminConnection.Close();
 

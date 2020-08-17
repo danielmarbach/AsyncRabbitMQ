@@ -9,8 +9,8 @@ namespace Concurrency
 {
     class Program
     {
-        private const string InputQueue = "basic-bits";
-        private const string ConsumerTag = "basic-bits";
+        private const string InputQueue = "concurrency-62";
+        private const string ConsumerTag = "concurrency-62";
 
         static async Task Main(string[] args)
         {
@@ -42,15 +42,16 @@ namespace Concurrency
 
             var consumer = new AsyncEventingBasicConsumer(receiveChannel);
 
+            #region NotRelevant
+
             consumer.Registered += Consumer_Registered;
             receiveConnection.ConnectionShutdown += Connection_ConnectionShutdown;
 
-            var exclusiveScheduler = new ConcurrentExclusiveSchedulerPair().ExclusiveScheduler;
+            #endregion
 
             consumer.Received += (sender,
                 deliverEventArgs) => Consumer_Received(deliverEventArgs,
                 receiveChannel,
-                exclusiveScheduler,
                 cts.Token);
 
             receiveChannel.BasicConsume(InputQueue, false, ConsumerTag, consumer);
@@ -72,6 +73,18 @@ namespace Concurrency
             #endregion
         }
 
+        private static async Task Consumer_Received(
+            BasicDeliverEventArgs e,
+            IModel channel,
+            CancellationToken cancellationToken)
+        {
+            await Console.Out.WriteLineAsync($"v: {Encoding.UTF8.GetString(e.Body.Span)} / q: {channel.MessageCount(InputQueue)}");
+
+            await Task.Delay(200, CancellationToken.None);
+
+            await channel.BasicAckSingle(e.DeliveryTag);
+        }
+
         private static async Task SendMessages(CancellationTokenSource cts, ConfirmsAwareChannel senderChannel,
             string inputQueue)
         {
@@ -80,21 +93,8 @@ namespace Concurrency
             {
                 var properties = senderChannel.CreateBasicProperties();
                 await senderChannel.SendMessage(inputQueue, messageNumber++.ToString(), properties);
-                await Task.Delay(250);
+                await Task.Delay(100);
             }
-        }
-
-        private static async Task Consumer_Received(
-            BasicDeliverEventArgs e,
-            IModel channel,
-            TaskScheduler exclusiveScheduler,
-            CancellationToken cancellationToken)
-        {
-            await Console.Out.WriteLineAsync($"v: {Encoding.UTF8.GetString(e.Body.Span)} / q: {channel.MessageCount(InputQueue)}");
-
-            await Task.Delay(1000, CancellationToken.None);
-
-            await channel.BasicAckSingle(e.DeliveryTag, exclusiveScheduler);
         }
 
         #region NotRelevant

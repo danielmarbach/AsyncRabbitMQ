@@ -9,8 +9,8 @@ namespace Concurrency
 {
     class Program
     {
-        private const string InputQueue = "basic-bits";
-        private const string ConsumerTag = "basic-bits";
+        private const string InputQueue = "concurrency";
+        private const string ConsumerTag = "concurrency";
 
         static async Task Main(string[] args)
         {
@@ -39,8 +39,12 @@ namespace Concurrency
 
             var consumer = new EventingBasicConsumer(receiveChannel);
 
+            #region NotRelevant
+
             consumer.Registered += Consumer_Registered;
             receiveConnection.ConnectionShutdown += Connection_ConnectionShutdown;
+
+            #endregion
 
             var exclusiveScheduler = new ConcurrentExclusiveSchedulerPair().ExclusiveScheduler;
 
@@ -76,18 +80,6 @@ namespace Concurrency
             sendConnection.Close();
 
             #endregion
-        }
-
-        private static async Task SendMessages(CancellationTokenSource cts, ConfirmsAwareChannel senderChannel,
-            string inputQueue)
-        {
-            var messageNumber = 0;
-            while (!cts.IsCancellationRequested)
-            {
-                var properties = senderChannel.CreateBasicProperties();
-                await senderChannel.SendMessage(inputQueue, messageNumber++.ToString(), properties);
-                await Task.Delay(100);
-            }
         }
 
         private static async void Consumer_Received(
@@ -128,6 +120,18 @@ namespace Concurrency
             finally
             {
                 semaphore.Release();
+            }
+        }
+
+        private static async Task SendMessages(CancellationTokenSource cts, ConfirmsAwareChannel senderChannel,
+            string inputQueue)
+        {
+            var messageNumber = 0;
+            while (!cts.IsCancellationRequested)
+            {
+                var properties = senderChannel.CreateBasicProperties();
+                await senderChannel.SendMessage(inputQueue, messageNumber++.ToString(), properties);
+                await Task.Delay(100);
             }
         }
 

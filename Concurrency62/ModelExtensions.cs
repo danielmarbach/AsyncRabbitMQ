@@ -18,14 +18,14 @@ namespace Concurrency
             public ulong DeliveryTag { get; }
         }
 
-        public static Task BasicAckSingle(this IModel channel, ulong deliveryTag, TaskScheduler scheduler)
+        public static Task BasicAckSingle(this IModel channel, ulong deliveryTag)
         {
             return Task.Factory.StartNew(state =>
                 {
                     var messageState = (MessageState) state;
                     messageState.Channel.BasicAck(messageState.DeliveryTag, false);
                 }, new MessageState(channel, deliveryTag), CancellationToken.None,
-                TaskCreationOptions.DenyChildAttach, scheduler);
+                TaskCreationOptions.DenyChildAttach, TaskScheduler.Default);
         }
     }
 }
