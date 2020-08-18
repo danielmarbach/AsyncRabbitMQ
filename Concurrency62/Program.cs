@@ -31,7 +31,7 @@ namespace Concurrency
             var cts = new CancellationTokenSource();
             var sendConnection = connectionFactory.CreateConnection($"{InputQueue} sender");
             var senderChannel = new ConfirmsAwareChannel(sendConnection);
-            var sendMessagesTask = Task.Run(() => SendMessages(cts, senderChannel, InputQueue), CancellationToken.None);
+            var sendMessagesTask = Task.Run(() => SendMessages(senderChannel, InputQueue, cts.Token), CancellationToken.None);
 
             var receiveConnection = connectionFactory.CreateConnection($"{InputQueue} pump");
             var receiveChannel = receiveConnection.CreateModel();
@@ -60,10 +60,17 @@ namespace Concurrency
 
             await Console.Error.WriteLineAsync("Press any key to stop");
             Console.ReadLine();
+            await Console.Error.WriteLineAsync("Shutting down");
 
             cts.Cancel();
 
-            await sendMessagesTask;
+            try
+            {
+                await sendMessagesTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
 
             receiveChannel.Close();
             receiveConnection.Close();
@@ -80,20 +87,20 @@ namespace Concurrency
         {
             await Console.Out.WriteLineAsync($"v: {Encoding.UTF8.GetString(e.Body.Span)} / q: {channel.MessageCount(InputQueue)}");
 
-            await Task.Delay(200, CancellationToken.None);
+            await Task.Delay(200, cancellationToken);
 
             await channel.BasicAckSingle(e.DeliveryTag);
         }
 
-        private static async Task SendMessages(CancellationTokenSource cts, ConfirmsAwareChannel senderChannel,
-            string inputQueue)
+        private static async Task SendMessages(ConfirmsAwareChannel senderChannel, string inputQueue,
+            CancellationToken cancellationToken)
         {
             var messageNumber = 0;
-            while (!cts.IsCancellationRequested)
+            while (!cancellationToken.IsCancellationRequested)
             {
                 var properties = senderChannel.CreateBasicProperties();
                 await senderChannel.SendMessage(inputQueue, messageNumber++.ToString(), properties);
-                await Task.Delay(100);
+                await Task.Delay(100, cancellationToken);
             }
         }
 
