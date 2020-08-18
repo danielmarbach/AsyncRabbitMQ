@@ -56,7 +56,7 @@ To get a better grasp of what is going on we first inspected the sync loop.
 
 The lock contention was so high that with more modern CPUs (at that time) when introducing concurrency only the throughput dropped in orders of magnitude.
  
-The reason was the `BatchingWorkPool`.
+The reason was the `BatchingWorkPool` and it's usage of locks as well as blocking collection.
  
 Takeaways:
  
