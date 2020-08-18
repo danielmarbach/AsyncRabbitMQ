@@ -133,6 +133,18 @@ Takeway:
  
  ### Channels
  
+ With the new 6.x major version we finally had the opportunity to start using System.Threading.Channels to overall improve the allocations of the client and hopefully the overall throughput.
+ 
+ - A single unbounded channel is used to write work into it
+ - A dedicated async work is scheduled to the worker thread pool that consumes messages from the channel and invokes the consumers
+ 
+ Here is the comparison benchmark that compares Channels vs TaskCompletionSource on the ingestion path. As you can see System.Threading.Channel is slightly slower but the overhead is neglectible given that the consumption is less allocation heavy and in general much more optimized with channels. Furthermore having the possibility to offload some of the complexity to a solution provided by Microsoft is very useful because over time when the channels get improved all the users of the RabbitmQ client can automatically benefit from those improvements as well. From a maintance perspective we can also say that having less code to own is generally a good thing.
+ 
+ Takeway:
+ 
+ - Channels are nice concurrency datastructures for producer/consumer patterns
+ - Not always the fastest solution is the best. All factors need to be taken into account
+ 
  ``` ini
  
  BenchmarkDotNet=v0.12.1, OS=Windows 10.0.19041.450 (2004/?/20H1)
@@ -148,24 +160,26 @@ Takeway:
  |               Method | Elements |            Mean |            Error |         StdDev |          Median | Ratio | RatioSD |     Gen 0 | Gen 1 | Gen 2 |   Allocated |
  |--------------------- |--------- |----------------:|-----------------:|---------------:|----------------:|------:|--------:|----------:|------:|------:|------------:|
  |              **Channel** |     **1000** |        **91.21 μs** |        **268.03 μs** |      **14.692 μs** |        **89.52 μs** |  **2.60** |    **0.40** |         **-** |     **-** |     **-** |         **6 B** |
- |        SemaphoreSlim |     1000 |       234.47 μs |      1,140.08 μs |      62.491 μs |       200.14 μs |  6.66 |    1.56 |         - |     - |     - |     16384 B |
  | TaskCompletionSource |     1000 |        35.03 μs |         21.80 μs |       1.195 μs |        34.98 μs |  1.00 |    0.00 |    0.6714 |     - |     - |     18363 B |
  |                      |          |                 |                  |                |                 |       |         |           |       |       |             |
  |              **Channel** |    **10000** |       **735.49 μs** |      **1,689.63 μs** |      **92.614 μs** |       **785.76 μs** |  **2.20** |    **0.31** |         **-** |     **-** |     **-** |        **51 B** |
- |        SemaphoreSlim |    10000 |     1,438.37 μs |      1,177.41 μs |      64.538 μs |     1,428.71 μs |  4.29 |    0.13 |         - |     - |     - |    163842 B |
  | TaskCompletionSource |    10000 |       335.52 μs |         93.06 μs |       5.101 μs |       334.69 μs |  1.00 |    0.00 |    7.8125 |     - |     - |    189706 B |
  |                      |          |                 |                  |                |                 |       |         |           |       |       |             |
  |              **Channel** |   **100000** |     **6,480.49 μs** |     **23,604.57 μs** |   **1,293.846 μs** |     **6,164.78 μs** |  **2.01** |    **0.35** |         **-** |     **-** |     **-** |       **290 B** |
- |        SemaphoreSlim |   100000 |    17,884.81 μs |    149,107.67 μs |   8,173.095 μs |    13,361.81 μs |  5.57 |    2.59 |         - |     - |     - |   1572909 B |
  | TaskCompletionSource |   100000 |     3,221.54 μs |      1,694.54 μs |      92.883 μs |     3,196.08 μs |  1.00 |    0.00 |   66.4063 |     - |     - |   1859820 B |
  |                      |          |                 |                  |                |                 |       |         |           |       |       |             |
  |              **Channel** |  **1000000** |    **95,381.12 μs** |    **544,484.47 μs** |  **29,845.031 μs** |    **85,179.71 μs** |  **2.82** |    **0.96** |         **-** |     **-** |     **-** |      **3231 B** |
- |        SemaphoreSlim |  1000000 |   343,370.58 μs |  6,778,783.54 μs | 371,568.000 μs |   129,102.90 μs | 10.33 |   11.43 |         - |     - |     - |  16777472 B |
  | TaskCompletionSource |  1000000 |    33,965.98 μs |     25,943.49 μs |   1,422.050 μs |    33,497.74 μs |  1.00 |    0.00 |  750.0000 |     - |     - |  18924852 B |
  |                      |          |                 |                  |                |                 |       |         |           |       |       |             |
  |              **Channel** | **10000000** |   **781,592.13 μs** |  **1,910,114.79 μs** | **104,699.837 μs** |   **821,476.40 μs** |  **2.29** |    **0.36** |         **-** |     **-** |     **-** |      **7744 B** |
- |        SemaphoreSlim | 10000000 | 2,477,222.77 μs | 10,618,315.06 μs | 582,025.678 μs | 2,426,359.80 μs |  7.22 |    1.53 |         - |     - |     - | 167774720 B |
  | TaskCompletionSource | 10000000 |   341,844.47 μs |    260,680.55 μs |  14,288.781 μs |   346,426.60 μs |  1.00 |    0.00 | 6000.0000 |     - |     - | 192727136 B |
 
  
  ### Concurrency
+ 
+ With the 6.2 release there will be first class support for concurrency which implements two redundant code paths. One for the concurrency = 1 case and one for the concurrency > 1.
+ 
+ Takeway:
+  
+  - Having first class concurrency support makes the client so much more usable and therefore user friendly
+  - Because the client now also uses internally System.Threading.Channels are interleaving problems are gone
