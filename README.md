@@ -1,12 +1,26 @@
 # Async RabbitMQ .NET Webinar
 
-he RabbitMQ .NET Client with more than 31 million downloads has a long and evolutionary history. In this webinar, Daniel Marbach dives into the inception of the first ideas on how to gradually move the client from its synchronous resource-hogging-nature to a more modern, asynchronous, and joyful client truly embracing concurrency. 
+The RabbitMQ .NET Client with more than 31 million downloads has a long and evolutionary history. In this webinar, Daniel Marbach dives into the inception of the first ideas on how to gradually move the client from its synchronous resource-hogging-nature to a more modern, asynchronous, and joyful client truly embracing concurrency. 
 
 In this webinar, you’ll learn about:
 - The RabbitMQ .NET Client whereabouts
 - The inception of an asynchronous code path into a purely synchronous code base
 - The improvements of the message consumption loops through several iterations up to using channels
 - The impact of async and concurrency on the client
+
+## Intro
+
+It is very important to me to not give the wrong impression. I was heavily involved in the worker service changes from the client version 4.1 until the recent changes at the time of writing introducing the redundant asynchronous code path I'm going to talk about here. But of course I would never claim to be the single owner of these changes. The VMWare team namely
+
+- [Luke Bakken](https://github.com/lukebakken)
+- [Michael Klishin](https://github.com/michaelklishin)
+
+as well as the community such as
+
+- [Brandon Ording](https://github.com/bording)
+- [Szymon Kulec](https://github.com/scooletz)
+- [Stefán Jökull Sigurðarson](https://github.com/stebet)
+- [Sandro Bollhalder](https://github.com/bollhals)
 
 ## Basic Client Bits
 
@@ -183,3 +197,8 @@ Takeway:
   
   - Having first class concurrency support makes the client so much more usable and therefore user friendly
   - Because the client now also uses internally System.Threading.Channels are interleaving problems are gone
+
+## What does the future hold?
+
+- Community effort to introduce a full async enabled channel API to truly unblock threads
+- Even more allocation reductions
