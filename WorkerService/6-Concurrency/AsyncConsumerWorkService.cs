@@ -94,6 +94,11 @@ namespace WorkerService
                             {
                                 await task.ConfigureAwait(false);
                             }
+                            else
+                            {
+                                // to materialize exceptions if any
+                                task.GetAwaiter().GetResult();
+                            }
                         }
                         catch (Exception e)
                         {
@@ -149,6 +154,11 @@ namespace WorkerService
                     if (!task.IsCompleted)
                     {
                         await task.ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        // to materialize exceptions if any
+                        task.GetAwaiter().GetResult();
                     }
                 }
                 catch (Exception e)
