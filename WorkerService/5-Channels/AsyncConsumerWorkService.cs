@@ -80,6 +80,11 @@ namespace WorkerService.Channels
                             {
                                 await task.ConfigureAwait(false);
                             }
+                            else
+                            {
+                                // to materialize exceptions if any
+                                task.GetAwaiter().GetResult();
+                            }
                         }
                         catch (Exception)
                         {
