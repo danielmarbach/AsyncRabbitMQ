@@ -20,8 +20,7 @@ namespace Concurrency
                 Port = 5672,
                 UseBackgroundThreadsForIO = true,
                 DispatchConsumersAsync = true,
-                ProcessingConcurrency = 4, // rc.1
-                // ConsumerDispatchConcurrency = 4, final
+                ConsumerDispatchConcurrency = 4
             };
 
             #region TopologyAndSending
