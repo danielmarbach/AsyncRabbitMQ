@@ -10,35 +10,40 @@ In this webinar, you’ll learn about:
 
 ## Intro
 
-It is very important to me to not give the wrong impression. I was heavily involved in the worker service changes from the client version 4.1 until the recent changes at the time of writing introducing the redundant asynchronous code path I'm going to talk about here. But of course I would never claim to be the single owner of these changes. The VMWare team namely
+For multiple years I have been contributing to the RabbitMQ .NET Client and helped to gradually evolve the client into a more modern and concurrency enabled library together with the VMWare team as well as other stellar community members. In this talk I will teach you valuable lessons I have learned about async and concurrency and how to evolve code bases over time into more modern concurrency paradigms. Many of the lessons can be translated into your business code as well. On top of that you'll get deep knowledge about async / TPL and will recap the fundaments of asynchronous and concurrent programming in .NET.
 
-- [Luke Bakken](https://github.com/lukebakken)
-- [Michael Klishin](https://github.com/michaelklishin)
+## Structure
 
-as well as the community such as
-
-- [Brandon Ording](https://github.com/bording)
-- [Szymon Kulec](https://github.com/scooletz)
-- [Stefán Jökull Sigurðarson](https://github.com/stebet)
-- [Sandro Bollhalder](https://github.com/bollhals)
+1. Make everybody familiar with the RabbitMQ API to receive messages from the broker so that everyone has a high level overview.
+1. Show how it is difficult to achieve concurrency with the basic consumer
+1. Talk about the process how the client was gradually evolved by
+   1. Understanding the synchronous path
+   1. Optimizing the synchronous path
+   1. Introduce a rundandant async path to plug in consumers
+   1. Cleaning up the mess created
+   1. Rip out custom code and replace is with `System.Threading.Channels`
+   1. First class support for concurrency within the client
+1. Wrap up
 
 ## Basic Client Bits
+
+> RabbitMQ is the most widely deployed open source message broker.
 
 RabbitMQ for historic reasons implements AMQP 0-9-1 protocol. AMQP 1.0 is supported via a plugin on the broker only. AMQP 0-9-1 has become the RabbitMQ protocol because there is as far as I know nobody else that supports AMQP 0-9-1. These are the basic primitives we need to know about
 
 - ConnectionFactory (`IConnectionFactory`) constructs connections
 - Connections (`IConnection`) represent a long-lived AMQP 0-9-1 connection that owns connection recovery, mapping of frames to headers, commands and more
-- Model (`IModel`) represents an AMQP 0-9-1 channel that is meant to be long-lived providing the operations to interact with the broker (protocol methods). For applications that use multiple threads/processes for processing, it is very common to open a new channel per thread/process and not share channels between them. As a rule of thumb, IModel instance usage by more than one thread simultaneously should be avoided. Application code should maintain a clear notion of thread ownership for IModel instances. This is a hard requirement for publishers: sharing a channel (an IModel instance) for concurrent publishing will lead to incorrect frame interleaving at the protocol level. Channel instances must not be shared by threads that publish on them. A single connection can have at max 100 channels (setting on the server) but managing many channels at the same time can decrease performance/throughput. 
+- Model (`IModel`) represents an AMQP 0-9-1 channel that is meant to be long-lived providing the operations to interact with the broker (protocol methods). For applications that use multiple threads/processes for processing, it is very common to open a new channel per thread/process and not share channels between them. As a rule of thumb, `IModel` instance usage by more than one thread simultaneously should be avoided. Application code should maintain a clear notion of thread ownership for IModel instances. This is a hard requirement for publishers: sharing a channel (an IModel instance) for concurrent publishing will lead to incorrect frame interleaving at the protocol level. Channel instances must not be shared by threads that publish on them. A single connection can have at max 100 channels (setting on the server) but managing many channels at the same time can decrease performance/throughput. 
 - Consumer (`IBasicConsumer` and other flavours) consumes protocol interactions from the broker (message received...)
 
-The demo shows that we are handling one message at a time and if the sender increases the speed of sending messages they start piling up on the broker.
+The demo shows that we are handling one message at a time and if the sender increases the speed of sending messages they start piling up on the broker. One way of speeding up the processing of the messages would be to scale out the consumer (aka having multiple instances) but before we do that it would be nice if we could make sure a single consumer can receive multiple messages in parallel (scale up). Let's see how we can achieve that.
 
 ## Concurrency
 
 - The basic consumer makes it very hard to achieve concurrency and asynchronicity. Ideally we'd want to use task based async for high throughput by `void` returning method make that painful
 - Either custom offloading to the worker thread pool can be used or the evil `async void`
 - Unfortunately any sort of concurrency within the consumer invalidates the client assumptions being able to return internally managed buffers once the consumer returned which then requires copying the body before yielding (will be solved in 6.2.0)
-- Concurrency has to be limited by using custom techniques like SemaphoreSlim
+- Concurrency has to be limited by using custom techniques like `SemaphoreSlim`
 - Because the semaphore `WaitAsync` might complete synchronously if there are still slots available `Yield` needs to be used to offload the current thread back to the worker thread pool to avoid blocking the clients reader loop thread.
 - Because interleaves on the same model are not allowed all model/channel operations need to be executed on a dedicated custom scheduler that prevents critical operations to interleave, see `BasicAckSingle`
 
@@ -49,11 +54,11 @@ The demo shows that we are handling one message at a time and if the sender incr
 
 How can we achieve better concurrency and asynchronicity support as a first class citizen in the client?
 
-Touching the model/channel based methods was not yet an option at the time so we started from the receiver perspective.
+Touching the model/channel based methods was not yet an option at the time so we started from the receiver perspective. So the high level idea here is to find the best entry point to enable asynchronicity without breaking all consumers and from there gradually expand the async support. Before we can do that we need to understand what is driving the messages to the consumers. Let's have a look at the `WorkerService`.
 
 ## WorkerService
 
-The worker service or consumer work service is the core worker service associated with a connection that "pumps" work to the consumers. 
+The worker service or consumer work service is the core worker service associated with a connection that "pumps" work to the consumers.
 
 ### Start
 
@@ -152,7 +157,7 @@ Takeway:
  - A single unbounded channel is used to write work into it
  - A dedicated async work is scheduled to the worker thread pool that consumes messages from the channel and invokes the consumers
  
- Here is the comparison benchmark that compares Channels vs TaskCompletionSource on the ingestion path. As you can see System.Threading.Channel is slightly slower but the overhead is neglectible given that the consumption is less allocation heavy and in general much more optimized with channels. Furthermore having the possibility to offload some of the complexity to a solution provided by Microsoft is very useful because over time when the channels get improved all the users of the RabbitmQ client can automatically benefit from those improvements as well. From a maintance perspective we can also say that having less code to own is generally a good thing.
+ Here is the comparison benchmark that compares `System.Threading.Channels` vs `TaskCompletionSource` on the ingestion path. As you can see `System.Threading.Channel` is slightly slower but the overhead is neglectible given that the consumption is less allocation heavy and in general much more optimized with channels. Furthermore having the possibility to offload some of the complexity to a solution provided by Microsoft is very useful because over time when the channels get improved all the users of the RabbitmQ client can automatically benefit from those improvements as well. From a maintance perspective we can also say that having less code to own is generally a good thing.
  
  Takeway:
  
@@ -196,9 +201,25 @@ Takeway:
  Takeway:
   
   - Having first class concurrency support makes the client so much more usable and therefore user friendly
-  - Because the client now also uses internally System.Threading.Channels are interleaving problems are gone
+  - Because the client now also uses internally `System.Threading.Channels` are interleaving problems are gone
 
 ## What does the future hold?
 
 - Community effort to introduce a full async enabled channel API to truly unblock threads
 - Even more allocation reductions
+
+## Recap and wrap-up
+
+## Disclaimer
+
+I was heavily involved in the worker service changes from the client version 4.1 until the recent changes at the time of writing introducing the redundant asynchronous code path I'm going to talk about here. But of course I would never claim to be the single owner of these changes. The VMWare team namely
+
+- [Luke Bakken](https://github.com/lukebakken)
+- [Michael Klishin](https://github.com/michaelklishin)
+
+as well as the community such as
+
+- [Brandon Ording](https://github.com/bording)
+- [Szymon Kulec](https://github.com/scooletz)
+- [Stefán Jökull Sigurðarson](https://github.com/stebet)
+- [Sandro Bollhalder](https://github.com/bollhals)
