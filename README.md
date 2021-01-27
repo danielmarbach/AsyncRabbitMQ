@@ -36,13 +36,13 @@ RabbitMQ for historic reasons implements AMQP 0-9-1 protocol. AMQP 1.0 is suppor
 - Model (`IModel`) represents an AMQP 0-9-1 channel that is meant to be long-lived providing the operations to interact with the broker (protocol methods). For applications that use multiple threads/processes for processing, it is very common to open a new channel per thread/process and not share channels between them. As a rule of thumb, `IModel` instance usage by more than one thread simultaneously should be avoided. Application code should maintain a clear notion of thread ownership for IModel instances. This is a hard requirement for publishers: sharing a channel (an IModel instance) for concurrent publishing will lead to incorrect frame interleaving at the protocol level. Channel instances must not be shared by threads that publish on them. A single connection can have at max 100 channels (setting on the server) but managing many channels at the same time can decrease performance/throughput. 
 - Consumer (`IBasicConsumer` and other flavours) consumes protocol interactions from the broker (message received...)
 
-The demo shows that we are handling one message at a time and if the sender increases the speed of sending messages they start piling up on the broker. One way of speeding up the processing of the messages would be to scale out the consumer (aka having multiple instances) but before we do that it would be nice if we could make sure a single consumer can receive multiple messages in parallel (scale up). Let's see how we can achieve that.
+The demo shows that we are handling one message at a time and if the sender increases the speed of sending messages they start piling up on the broker. One way of speeding up the processing of the messages would be to scale out the consumer (aka having multiple instances) but before we do that it would be nice if we could make sure a single consumer can receive multiple messages in parallel (scale up). It would be possible to create multiple models or register multiple basic consumers on the same model. This approach though can make receiving and handling of messages extremely complex. Let's what else we can do.
 
 ## Concurrency
 
 - The basic consumer makes it very hard to achieve concurrency and asynchronicity. Ideally we'd want to use task based async for high throughput by `void` returning method make that painful
 - Either custom offloading to the worker thread pool can be used or the evil `async void`
-- Unfortunately any sort of concurrency within the consumer invalidates the client assumptions being able to return internally managed buffers once the consumer returned which then requires copying the body before yielding (will be solved in 6.2.0)
+- Unfortunately any sort of concurrency within the consumer invalidates the client assumptions being able to return internally managed buffers once the consumer returned which then requires copying the body before yielding (will be solved in 6.2.0).
 - Concurrency has to be limited by using custom techniques like `SemaphoreSlim`
 - Because the semaphore `WaitAsync` might complete synchronously if there are still slots available `Yield` needs to be used to offload the current thread back to the worker thread pool to avoid blocking the clients reader loop thread.
 - Because interleaves on the same model are not allowed all model/channel operations need to be executed on a dedicated custom scheduler that prevents critical operations to interleave, see `BasicAckSingle`
@@ -152,12 +152,14 @@ Takeway:
  
  ### Channels
  
- With the new 6.x major version we finally had the opportunity to start using System.Threading.Channels to overall improve the allocations of the client and hopefully the overall throughput.
+ With the new 6.x major version we finally had the opportunity to start using `System.Threading.Channels` to overall improve the allocations of the client and hopefully the overall throughput.
  
  - A single unbounded channel is used to write work into it
  - A dedicated async work is scheduled to the worker thread pool that consumes messages from the channel and invokes the consumers
  
- Here is the comparison benchmark that compares `System.Threading.Channels` vs `TaskCompletionSource` on the ingestion path. As you can see `System.Threading.Channel` is slightly slower but the overhead is neglectible given that the consumption is less allocation heavy and in general much more optimized with channels. Furthermore having the possibility to offload some of the complexity to a solution provided by Microsoft is very useful because over time when the channels get improved all the users of the RabbitmQ client can automatically benefit from those improvements as well. From a maintance perspective we can also say that having less code to own is generally a good thing.
+ Here is the comparison benchmark that compares `System.Threading.Channels` vs `TaskCompletionSource` on the ingestion path. As you can see `System.Threading.Channel` is slightly slower but the overhead is neglectible given that the consumption is less allocation heavy and in general much more optimized with channels. 
+ 
+ Furthermore having the possibility to offload some of the complexity to a solution provided by Microsoft is very useful because over time when the channels get improved all the users of the RabbitmQ client can automatically benefit from those improvements as well. From a maintance perspective we can also say that having less code to own is generally a good thing.
  
  Takeway:
  
@@ -209,6 +211,15 @@ Takeway:
 - Even more allocation reductions
 
 ## Recap and wrap-up
+
+- Find the IO-bound paths in your code
+- Closely look through the IO path to make sure you can get rid of lock contention
+- If possible start introducing a redundant code path that is async all the way
+- Gradually start extending your IO paths to never block threads. Only custom offload where really necessary
+- Adhere to the async/best practices
+- If you are targetting .NET 5 consider [ValueTask](https://devblogs.microsoft.com/dotnet/understanding-the-whys-whats-and-whens-of-valuetask/) because you might get a lot of benefits from the [value task pooling](https://devblogs.microsoft.com/dotnet/async-valuetask-pooling-in-net-5/)
+- Code that you don't have to write and maintain yourself that can be replaced with a reliable BCL component like `System.Threading.Channels` should be prefered
+- Last but not least if you are looking for ways to contribute to OSS head over to https://github.com/rabbitmq/rabbitmq-dotnet-client
 
 ## Disclaimer
 
