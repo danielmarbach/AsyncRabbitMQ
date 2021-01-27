@@ -1,11 +1,12 @@
-# Async RabbitMQ .NET Webinar
+# Evolutionary history of the RabbitMQ .NET Client towards concurrency
 
-The RabbitMQ .NET Client with more than 31 million downloads has a long and evolutionary history. In this webinar, Daniel Marbach dives into the inception of the first ideas on how to gradually move the client from its synchronous resource-hogging-nature to a more modern, asynchronous, and joyful client truly embracing concurrency. 
+## Abstract
 
-In this webinar, you’ll learn about:
+The RabbitMQ .NET Client with more than 31 million downloads and has a long and evolutionary history. In this talk, I dive into the inception of the first ideas on gradually moving the client from its synchronous resource-hogging-nature to a more modern, asynchronous, and joyful client truly embracing concurrency. You’ll learn about:
+
 - The RabbitMQ .NET Client whereabouts
 - The inception of an asynchronous code path into a purely synchronous code base
-- The improvements of the message consumption loops through several iterations up to using channels
+- The improvements of the message consumption loop through several iterations up to using channels
 - The impact of async and concurrency on the client
 
 ## Intro
