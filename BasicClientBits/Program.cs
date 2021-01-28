@@ -30,14 +30,14 @@ namespace BasicClientBits
             var senderChannel = new ConfirmsAwareChannel(sendConnection);
             var sendMessagesTask = Task.Run(() => SendMessages(senderChannel, InputQueue, cts.Token), CancellationToken.None);
 
-            var receiveConnection = connectionFactory.CreateConnection($"{InputQueue} pump");
-            var receiveChannel = receiveConnection.CreateModel();
-
             #endregion
 
-            receiveChannel.BasicQos(prefetchSize: 0, prefetchCount: 10, global: false);
+            var receiveConnection = connectionFactory.CreateConnection($"{InputQueue} pump");
+            var receiveModel = receiveConnection.CreateModel();
 
-            var consumer = new EventingBasicConsumer(receiveChannel);
+            receiveModel.BasicQos(prefetchSize: 0, prefetchCount: 10, global: false);
+
+            var consumer = new EventingBasicConsumer(receiveModel);
 
             #region NotRelevant
 
@@ -46,9 +46,9 @@ namespace BasicClientBits
 
             #endregion
 
-            consumer.Received += (sender, args) => Consumer_Received(sender, args, receiveChannel);
+            consumer.Received += (sender, args) => Consumer_Received(sender, args, receiveModel);
 
-            receiveChannel.BasicConsume(InputQueue, false, ConsumerTag, consumer);
+            receiveModel.BasicConsume(InputQueue, false, ConsumerTag, consumer);
 
             #region Stop
 
@@ -66,7 +66,7 @@ namespace BasicClientBits
             {
             }
 
-            receiveChannel.Close();
+            receiveModel.Close();
             receiveConnection.Close();
             senderChannel.Dispose();
             sendConnection.Close();
@@ -74,13 +74,13 @@ namespace BasicClientBits
             #endregion
         }
 
-        private static void Consumer_Received(object? sender, BasicDeliverEventArgs e, IModel channel)
+        private static void Consumer_Received(object? sender, BasicDeliverEventArgs e, IModel receiveModel)
         {
-            Console.Out.WriteLine($"v: {Encoding.UTF8.GetString(e.Body.Span)} / q: {channel.MessageCount(InputQueue)}");
+            Console.Out.WriteLine($"v: {Encoding.UTF8.GetString(e.Body.Span)} / q: {receiveModel.MessageCount(InputQueue)}");
 
             Thread.Sleep(1000);
 
-            channel.BasicAck(e.DeliveryTag, false);
+            receiveModel.BasicAck(e.DeliveryTag, false);
         }
 
         private static async Task SendMessages(ConfirmsAwareChannel senderChannel, string inputQueue,

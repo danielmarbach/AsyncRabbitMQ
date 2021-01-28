@@ -31,15 +31,15 @@ namespace Concurrency
             var sendMessagesTask = Task.Run(() => SendMessages(senderChannel, InputQueue, cts.Token), CancellationToken.None);
 
             var receiveConnection = connectionFactory.CreateConnection($"{InputQueue} pump");
-            var receiveChannel = receiveConnection.CreateModel();
+            var receiveModel = receiveConnection.CreateModel();
 
             TaskScheduler.UnobservedTaskException += (sender, args) => { };
 
             #endregion
 
-            receiveChannel.BasicQos(prefetchSize: 0, prefetchCount: 10, global: false);
+            receiveModel.BasicQos(prefetchSize: 0, prefetchCount: 10, global: false);
 
-            var consumer = new EventingBasicConsumer(receiveChannel);
+            var consumer = new EventingBasicConsumer(receiveModel);
 
             #region NotRelevant
 
@@ -55,12 +55,12 @@ namespace Concurrency
 
             consumer.Received += (sender,
                 deliverEventArgs) => Consumer_Received(deliverEventArgs,
-                receiveChannel,
+                receiveModel,
                 semaphore,
                 exclusiveScheduler,
                 cts.Token);
 
-            receiveChannel.BasicConsume(InputQueue, false, ConsumerTag, consumer);
+            receiveModel.BasicConsume(InputQueue, false, ConsumerTag, consumer);
 
             #region Stop
 
@@ -83,7 +83,7 @@ namespace Concurrency
                 await Task.Delay(50).ConfigureAwait(false);
             }
 
-            receiveChannel.Close();
+            receiveModel.Close();
             receiveConnection.Close();
             senderChannel.Dispose();
             sendConnection.Close();
@@ -93,7 +93,7 @@ namespace Concurrency
 
         private static async void Consumer_Received(
             BasicDeliverEventArgs e,
-            IModel channel,
+            IModel receiveModel,
             SemaphoreSlim semaphore,
             TaskScheduler exclusiveScheduler,
             CancellationToken cancellationToken)
@@ -121,11 +121,11 @@ namespace Concurrency
                 }
 
                 await Console.Out.WriteLineAsync(
-                    $"v: {(didYield ? "Y" : string.Empty)}{Encoding.UTF8.GetString(bodyCopy)} / q: {channel.MessageCount(InputQueue)}");
+                    $"v: {(didYield ? "Y" : string.Empty)}{Encoding.UTF8.GetString(bodyCopy)} / q: {receiveModel.MessageCount(InputQueue)}");
 
                 await Task.Delay(1000, cancellationToken);
 
-                await channel.BasicAckSingle(e.DeliveryTag, exclusiveScheduler);
+                await receiveModel.BasicAckSingle(e.DeliveryTag, exclusiveScheduler);
             }
             catch (OperationCanceledException)
             {

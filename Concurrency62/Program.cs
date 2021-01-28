@@ -33,13 +33,13 @@ namespace Concurrency
             var sendMessagesTask = Task.Run(() => SendMessages(senderChannel, InputQueue, cts.Token), CancellationToken.None);
 
             var receiveConnection = connectionFactory.CreateConnection($"{InputQueue} pump");
-            var receiveChannel = receiveConnection.CreateModel();
+            var receiveModel = receiveConnection.CreateModel();
 
             #endregion
 
-            receiveChannel.BasicQos(prefetchSize: 0, prefetchCount: 10, global: false);
+            receiveModel.BasicQos(prefetchSize: 0, prefetchCount: 10, global: false);
 
-            var consumer = new AsyncEventingBasicConsumer(receiveChannel);
+            var consumer = new AsyncEventingBasicConsumer(receiveModel);
 
             #region NotRelevant
 
@@ -50,10 +50,10 @@ namespace Concurrency
 
             consumer.Received += (sender,
                 deliverEventArgs) => Consumer_Received(deliverEventArgs,
-                receiveChannel,
+                receiveModel,
                 cts.Token);
 
-            receiveChannel.BasicConsume(InputQueue, false, ConsumerTag, consumer);
+            receiveModel.BasicConsume(InputQueue, false, ConsumerTag, consumer);
 
             #region Stop
 
@@ -71,7 +71,7 @@ namespace Concurrency
             {
             }
 
-            receiveChannel.Close();
+            receiveModel.Close();
             receiveConnection.Close();
             senderChannel.Dispose();
             sendConnection.Close();
@@ -81,14 +81,14 @@ namespace Concurrency
 
         private static async Task Consumer_Received(
             BasicDeliverEventArgs e,
-            IModel channel,
+            IModel receiveModel,
             CancellationToken cancellationToken)
         {
-            await Console.Out.WriteLineAsync($"v: {Encoding.UTF8.GetString(e.Body.Span)} / q: {channel.MessageCount(InputQueue)}");
+            await Console.Out.WriteLineAsync($"v: {Encoding.UTF8.GetString(e.Body.Span)} / q: {receiveModel.MessageCount(InputQueue)}");
 
             await Task.Delay(200, cancellationToken);
 
-            await channel.BasicAckSingle(e.DeliveryTag);
+            await receiveModel.BasicAckSingle(e.DeliveryTag);
         }
 
         private static async Task SendMessages(ConfirmsAwareChannel senderChannel, string inputQueue,
