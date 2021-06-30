@@ -12,6 +12,7 @@ namespace BasicClientBits
         private const string InputQueue = "basic-bits";
         private const string ConsumerTag = "basic-bits";
 
+        //  docker run -d --hostname my-rabbit --name some-rabbit -p 15672:15672 -p 5672:5672 rabbitmq:3-management
         static async Task Main(string[] args)
         {
             var connectionFactory = new ConnectionFactory
