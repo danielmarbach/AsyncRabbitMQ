@@ -28,7 +28,7 @@ Seit mehreren Jahren trage ich zum RabbitMQ .NET-Client bei und habe dabei gehol
    1. Erstklassige Unterstützung für Gleichzeitigkeit innerhalb des Clients
 1. Einpacken
 
-## Grundlegende Client-Bits
+## Basic Client Bits
 
 > RabbitMQ ist der am weitesten verbreitete Open Source Message Broker.
 
@@ -36,12 +36,12 @@ RabbitMQ implementiert aus historischen Gründen das AMQP 0-9-1-Protokoll. AMQP 
 
 - ConnectionFactory (`IConnectionFactory`) konstruiert Verbindungen
 - Connections (`IConnection`) repräsentiert eine langlebige AMQP 0-9-1 Verbindung, die Verbindungswiederherstellung, Mapping von Frames auf Header, Befehle und mehr besitzt
-- Model (`IModel`) repräsentiert einen AMQP 0-9-1-Kanal, der langlebig sein soll und die Operationen zur Interaktion mit dem Broker (Protokollmethoden) bereitstellt. Bei Anwendungen, die mehrere Threads/Prozesse für die Verarbeitung verwenden, ist es sehr üblich, einen neuen Kanal pro Thread/Prozess zu öffnen und die Kanäle nicht untereinander zu teilen. Als Faustregel gilt, dass die Verwendung von `IModel`-Instanzen durch mehr als einen Thread gleichzeitig vermieden werden sollte. Der Anwendungscode sollte eine klare Vorstellung von der Thread-Eigentümerschaft für IModel-Instanzen haben. Dies ist eine harte Anforderung für Publisher: Die gemeinsame Nutzung eines Kanals (einer IModel-Instanz) für gleichzeitiges Publishing führt zu falschem Frame-Interleaving auf Protokollebene. Kanalinstanzen dürfen nicht von Threads geteilt werden, die auf ihnen veröffentlichen. Eine einzelne Verbindung kann maximal 100 Kanäle haben (Einstellung auf dem Server), aber die Verwaltung vieler Kanäle zur gleichen Zeit kann die Leistung/den Durchsatz verringern. 
+- Model (`IModel`) repräsentiert einen AMQP 0-9-1-Kanal, der langlebig sein soll und die Operationen zur Interaktion mit dem Broker (Protokollmethoden) bereitstellt. Bei Anwendungen, die mehrere Threads/Prozesse für die Verarbeitung verwenden, ist es sehr üblich, einen neuen Kanal pro Thread/Prozess zu öffnen und die Kanäle nicht untereinander zu teilen. Als Faustregel gilt, dass die Verwendung von `IModel`-Instanzen durch mehr als einen Thread gleichzeitig vermieden werden sollte. Der Anwendungscode sollte eine klare Vorstellung von der Thread-Eigentümerschaft für IModel-Instanzen haben. Dies ist eine harte Anforderung für Publisher: Die gemeinsame Nutzung eines Kanals (einer IModel-Instanz) für gleichzeitiges Publishing führt zu falschem Frame-Interleaving auf Protokollebene. Kanalinstanzen dürfen nicht von Threads geteilt werden, die auf ihnen veröffentlichen. Eine einzelne Verbindung kann maximal 100 Kanäle haben (Einstellung auf dem Server), aber die Verwaltung vieler Kanäle zur gleichen Zeit kann die Leistung/den Durchsatz verringern.
 - Consumer (`IBasicConsumer` und andere Varianten) konsumiert Protokollinteraktionen vom Broker (empfangene Nachrichten...)
 
 Die Demo zeigt, dass wir jeweils eine Nachricht verarbeiten, und wenn der Sender die Geschwindigkeit des Versendens von Nachrichten erhöht, beginnen sie sich beim Broker zu stapeln. Eine Möglichkeit, die Verarbeitung der Nachrichten zu beschleunigen, wäre es, den Consumer zu skalieren (d.h. mehrere Instanzen zu haben), aber bevor wir das tun, wäre es schön, wenn wir sicherstellen könnten, dass ein einzelner Consumer mehrere Nachrichten parallel empfangen kann (Scale-up). Es wäre möglich, mehrere Modelle zu erstellen oder mehrere Basis-Consumer auf demselben Modell zu registrieren. Dieser Ansatz kann jedoch den Empfang und die Verarbeitung von Nachrichten extrem komplex machen. Lassen Sie uns sehen, was wir sonst noch tun können.
 
-## Gleichzeitigkeit
+## Concurrency
 
 - Der Basic Consumer macht es sehr schwer, Gleichzeitigkeit und Asynchronität zu erreichen. Idealerweise würden wir Task-basierte Asynchronität für einen hohen Durchsatz verwenden wollen, da die `void`-Rückgabemethode das sehr schwierig macht
 - Entweder kann ein benutzerdefiniertes Offloading auf den Worker-Thread-Pool verwendet werden oder das böse `async void`
@@ -77,60 +77,60 @@ Um ein besseres Verständnis für das Geschehen zu bekommen, haben wir uns zunä
 | i7-6700K (Skylake)| 6476 msg/s | 2213 msg/s  |
 
 Die Lockcontention war so hoch, dass bei moderneren CPUs (zu dieser Zeit) bei Einführung der Gleichzeitigkeit nur der Durchsatz in Größenordnungen sank.
- 
+
 Der Grund dafür war der `BatchingWorkPool` und seine Verwendung von Locks sowie die blockierende Collection.
- 
+
 Schlussfolgerungen:
- 
+
  - Lock Contention, schlecht!
  - Locks sind generell schlecht, weil man innerhalb von Lock-Anweisungen nicht warten kann (ein Thread, der eine Lock betritt, muss sie auch wieder freigeben)
  - Wenn Sie nicht an Ihren Lock-Problemen arbeiten, wird Ihnen auch async nicht viel helfen
 
 ### OptimizeSync
- 
+
 Siehe [RabbitMQ NServiceBus 6 Updates](https://particular.net/blog/rabbitmq-updates-in-nservicebus-6)
- 
+
 Durch die Verwendung eines `ConcurrentDictionary`, um die Modelle auf die Worker-Pools abzubilden und die Verwendung einer `ConcurrentQueue` mit einem dedizierten `AutoResetEvent`, um die Verbrauchsschleife auszulösen, haben wir nicht nur die Schleife besser verstanden, sondern auch die Empfangsleistung enorm verbessert.
- 
+
  |Matchup|VersionsCompared|Send ThroughputImprovement|Receive ThroughputImprovement|
  |--- |--- |--- |--- |
  |V6 improvements only|3.5 => 4.1|5.45|1.69|
  |V6 + lock contention fix|3.4 => 4.1|5.54|6.66|
- 
+
 Mitnahmen:
-  
+
   - Das Entfernen von Sperren kann befreiend sein
   - Durchsatzverbesserungen in Größenordnungen, nur indem man das tut
- 
+
 ### Async
- 
+
  Aufgrund der großen Nutzerbasis des Clients wollten wir schrittweise Änderungen einführen. Ein guter Weg, dies zu tun, ist die Einführung eines alternativen asynchronen E/A-Pfads, der aktiviert werden kann. Also haben wir eine `IAsyncConnectionFactory` und ein `DispatchConsumersAsync` erstellt, das dann einen neuen Consumer-Work-Service mit einem dedizierten `AsyncDefaultBasicConsumer` sowie einem `AsyncEventingBasicConsumer`, der sich mit Asynchronität beschäftigt, einbindet. Da wir immer noch auf .NET 4.5.x abzielen, mussten wir ein paar Workarounds machen.
- 
+
  In diesem Stadium war es möglich, Empfangsmethoden zu deklarieren, die einen Task zurückgeben. Das Erreichen von Gleichzeitigkeit war immer noch ein kleiner Alptraum, da der Client den Receive-Handler nicht gleichzeitig aufrufen würde. Sie mussten immer noch die gesamte Gleichzeitigkeitsbehandlung selbst durchführen, einschließlich der Vermeidung von Interleaves.
- 
+
 Schlussfolgerungen:
 
 - Das Freigeben der Threadpool-Threads ist entscheidend, um eine hohe IO-Sättigung zu erreichen
 - Task-basierte APIs sind der Schlüssel zum Erreichen dieses Ziels, und es führt kein Weg daran vorbei, sie zu unterstützen
-- Manchmal, aber nicht immer, ist es möglich, sich auf einen einzigen Codepfad zu konzentrieren, um async und Tasks/ValueTask einzubauen, ohne von der viralen Natur von async/await betroffen zu sein. Async all the way ist der Schlüssel. Leider sind wir noch nicht so weit, da viele der IO-gebundenen Kanalmethoden immer noch sync sind und ein dediziertes Offloading erfordern. 
- 
-### Aufräumen
- 
+- Manchmal, aber nicht immer, ist es möglich, sich auf einen einzigen Codepfad zu konzentrieren, um async und Tasks/ValueTask einzubauen, ohne von der viralen Natur von async/await betroffen zu sein. Async all the way ist der Schlüssel. Leider sind wir noch nicht so weit, da viele der IO-gebundenen Kanalmethoden immer noch sync sind und ein dediziertes Offloading erfordern.
+
+### Cleanup
+
  Sobald wir .NET 4.6 und höher im Visier hatten, konnten wir einige der Workarounds loswerden, die wir im Einsatz hatten.
- 
+
  Irgendwann versuchten wir, die TaskCompletionSource durch eine SemaphoreSlim zu ersetzen (unter dem Benchmark wird die Ingestion/Enqueue-Geschwindigkeit untersucht)
- 
+
  ``` ini
- 
+
  BenchmarkDotNet=v0.12.1, OS=Windows 10.0.19041.450 (2004/?/20H1)
  AMD Ryzen Threadripper 1920X, 1 CPU, 24 logical and 12 physical cores
  .NET Core SDK=3.1.302
    [Host]   : .NET Core 3.1.6 (CoreCLR 4.700.20.26901, CoreFX 4.700.20.31603), X64 RyuJIT
    ShortRun : .NET Core 3.1.6 (CoreCLR 4.700.20.26901, CoreFX 4.700.20.31603), X64 RyuJIT
- 
- Job=ShortRun  IterationCount=3  LaunchCount=1  
- WarmupCount=3  
- 
+
+ Job=ShortRun  IterationCount=3  LaunchCount=1
+ WarmupCount=3
+
  ```
  |               Method | Elements |            Mean |            Error |         StdDev |          Median | Ratio | RatioSD |     Gen 0 | Gen 1 | Gen 2 |   Allocated |
  |--------------------- |--------- |----------------:|-----------------:|---------------:|----------------:|------:|--------:|----------:|------:|------:|------------:|
@@ -148,39 +148,39 @@ Schlussfolgerungen:
  |                      |          |                 |                  |                |                 |       |         |           |       |       |             |
   |        SemaphoreSlim | 10000000 | 2,477,222.77 μs | 10,618,315.06 μs | 582,025.678 μs | 2,426,359.80 μs |  7.22 |    1.53 |         - |     - |     - | 167774720 B |
  | TaskCompletionSource | 10000000 |   341,844.47 μs |    260,680.55 μs |  14,288.781 μs |   346,426.60 μs |  1.00 |    0.00 | 6000.0000 |     - |     - | 192727136 B |
- 
+
 Mitnahme:
 
 - Messen, messen, messen
- 
- ### Kanäle
- 
+
+### Channels
+
  Mit der neuen 6.x-Hauptversion hatten wir endlich die Möglichkeit, `System.Threading.Channels` zu verwenden, um insgesamt die Zuweisungen des Clients und hoffentlich den Gesamtdurchsatz zu verbessern.
- 
+
  - Ein einzelner unbeschränkter Kanal wird verwendet, um Arbeit in ihn zu schreiben
  - Eine dedizierte asynchrone Arbeit wird in den Worker-Thread-Pool eingeplant, der Nachrichten aus dem Kanal konsumiert und die Consumer aufruft
- 
- Hier ist der Vergleichs-Benchmark, der `System.Threading.Channels` mit `TaskCompletionSource` auf dem Ingestion-Pfad vergleicht. Wie Sie sehen können, ist `System.Threading.Channels` etwas langsamer, aber der Overhead ist vernachlässigbar, da der Verbrauch weniger allokationslastig ist und im Allgemeinen mit Channels viel optimierter ist. 
- 
+
+ Hier ist der Vergleichs-Benchmark, der `System.Threading.Channels` mit `TaskCompletionSource` auf dem Ingestion-Pfad vergleicht. Wie Sie sehen können, ist `System.Threading.Channels` etwas langsamer, aber der Overhead ist vernachlässigbar, da der Verbrauch weniger allokationslastig ist und im Allgemeinen mit Channels viel optimierter ist.
+
  Außerdem ist die Möglichkeit, einen Teil der Komplexität an eine von Microsoft bereitgestellte Lösung auszulagern, sehr nützlich, da mit der Zeit, wenn die Channels verbessert werden, alle Benutzer des RabbitmQ-Clients automatisch von diesen Verbesserungen profitieren können. Aus der Wartungsperspektive können wir auch sagen, dass es generell eine gute Sache ist, weniger Code zu besitzen.
- 
+
  Takeway:
- 
+
  - Channels sind schöne Nebenläufigkeitsdatenstrukturen für Producer/Consumer-Muster
  - Nicht immer ist die schnellste Lösung auch die beste. Alle Faktoren müssen berücksichtigt werden
 
 
  ``` ini
- 
+
  BenchmarkDotNet=v0.12.1, OS=Windows 10.0.19041.450 (2004/?/20H1)
  AMD Ryzen Threadripper 1920X, 1 CPU, 24 logical and 12 physical cores
  .NET Core SDK=3.1.302
    [Host]   : .NET Core 3.1.6 (CoreCLR 4.700.20.26901, CoreFX 4.700.20.31603), X64 RyuJIT
    ShortRun : .NET Core 3.1.6 (CoreCLR 4.700.20.26901, CoreFX 4.700.20.31603), X64 RyuJIT
- 
- Job=ShortRun  IterationCount=3  LaunchCount=1  
- WarmupCount=3  
- 
+
+ Job=ShortRun  IterationCount=3  LaunchCount=1
+ WarmupCount=3
+
  ```
  |               Method | Elements |            Mean |            Error |         StdDev |          Median | Ratio | RatioSD |     Gen 0 | Gen 1 | Gen 2 |   Allocated |
  |--------------------- |--------- |----------------:|-----------------:|---------------:|----------------:|------:|--------:|----------:|------:|------:|------------:|
@@ -199,12 +199,12 @@ Mitnahme:
  |              **Channel** | **10000000** |   **781,592.13 μs** |  **1,910,114.79 μs** | **104,699.837 μs** |   **821,476.40 μs** |  **2.29** |    **0.36** |         **-** |     **-** |     **-** |      **7744 B** |
  | TaskCompletionSource | 10000000 |   341,844.47 μs |    260,680.55 μs |  14,288.781 μs |   346,426.60 μs |  1.00 |    0.00 | 6000.0000 |     - |     - | 192727136 B |
 
-### Gleichzeitigkeit
- 
+### Concurrency
+
 Mit der Version 6.2 wird es eine erstklassige Unterstützung für Gleichzeitigkeit geben, die zwei redundante Codepfade implementiert. Einen für den Fall der Gleichzeitigkeit = 1 und einen für den Fall der Gleichzeitigkeit > 1.
- 
+
 Mitnahme:
-  
+
   - Die First-Class-Unterstützung für Gleichzeitigkeit macht den Client so viel benutzerfreundlicher
   - Da der Client nun auch intern `System.Threading.Channels` verwendet, gibt es keine Verschachtelungsprobleme mehr
 
